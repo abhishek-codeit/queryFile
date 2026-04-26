@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.136.1",
+    "groq>=1.2.0",
     "inngest>=0.5.18",
     "llama-index-readers-file>=0.6.0",
     "ollama>=0.6.1",

@@ -7,10 +7,13 @@ from dotenv import load_dotenv
 import uuid
 import os
 import ollama
+from groq import Groq
 import datetime
 from data_loader import load_and_chunk_pdf, embed_texts
 from vector_db import QdrantStorage
 from custom_Type import RAGChunkAndSrc, RAGSearchResult,RAGUpsertResult,RAQQueryResult
+
+
 load_dotenv()
 
 inngest_client = inngest.Inngest(
@@ -22,7 +25,7 @@ inngest_client = inngest.Inngest(
 
 
 
-
+groq_client = Groq(api_key=os.getenv("GROQ_API"))
 app = FastAPI()
 
 @inngest_client.create_function(
@@ -83,23 +86,37 @@ async def rag_query_pdf_ai(ctx: inngest.Context) -> RAGSearchResult:
         f"Question: {question}\n"
         "Answer concisely using the context above."
     )
-    async def _ollama_chat():
-        response = ollama.chat(
-            model="llama3.2:1b",
+    # async def _ollama_chat():
+    #     response = ollama.chat(
+    #         model="llama3.2:1b",
+    #         messages=[
+    #             {"role": "system","content": "You answer questions using only the provided context."},
+    #             {"role": "user","content":user_content}
+    #         ],
+    #         options={"temperature":0.2}
+    #     )
+    #     return response["message"]["content"]
+    
+    def _groq_call():
+
+        completion = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system","content": "You answer questions using only the provided context."},
                 {"role": "user","content":user_content}
             ],
-            options={"temperature":0.2}
+            temperature=0.2,
+            max_tokens=1024
         )
-        return response["message"]["content"]
-    
+
+
+        return completion.choices[0].message.content
     # adapter for OpenAI 
     # adapter = ai.openai.Adapter(
     #     auth_key=os.getenv("OPENAI_API_KEY"),
     #     model="gpt-40-mini"
     # )
-
+    
     # res = await ctx.step.ai.infer(
     #     "llm-answer",
     #     adapter=adapter,
@@ -113,7 +130,8 @@ async def rag_query_pdf_ai(ctx: inngest.Context) -> RAGSearchResult:
     #     }
     # )
 
-    answer = await ctx.step.run("ollama-llm-answer",lambda: _ollama_chat())
+    # answer = await ctx.step.run("ollama-llm-answer",lambda: _ollama_chat())
+    answer = await ctx.step.run("groq-llm-answer",lambda: _groq_call())
     print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
     print(answer)
     return {"answer": answer.strip(), "sources": list(set(found.sources)), "num_contexts": len(found.contexts)}
